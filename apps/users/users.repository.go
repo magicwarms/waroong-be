@@ -22,7 +22,7 @@ func NewRepo(gormDB *gorm.DB) *userRepository {
 }
 
 // Save is to save user data based on user input
-func (userRepo *userRepository) Save(user *model.UserModel) error {
+func (userRepo *userRepository) Store(user *model.UserModel) error {
 	// begin a transaction
 	return config.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&user).Error; err != nil {
@@ -33,33 +33,39 @@ func (userRepo *userRepository) Save(user *model.UserModel) error {
 }
 
 // GetUserByEmail is to get only one user data by Email
-func (userRepo *userRepository) GetUserByEmail(email string, userTypeId uint) (*model.UserModel, error) {
+func (userRepo *userRepository) GetUserByEmail(email string) (*model.UserModel, error) {
 	var user model.UserModel
 	result := userRepo.db.Preload("UserType", func(db *gorm.DB) *gorm.DB {
 		return db.Select("id")
 	}).Preload("Profile", func(db *gorm.DB) *gorm.DB {
 		return db.Select("id", "user_id")
-	}).Select("users.id", "email", "password", "users.is_active").Where("email = ?", email).Take(&user)
+	}).Select("users.id", "email", "password", "users.is_active", "user_type_id").Where("email = ?", email).Take(&user)
+
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return &model.UserModel{}, nil
+		return &model.UserModel{}, result.Error
 	}
+
 	if result.Error != nil {
 		return &model.UserModel{}, result.Error
 	}
+
 	return &user, nil
 }
 
 // GetAll is to get all user data
 func (userRepo *userRepository) GetAllSuperadminUsers() ([]*model.UserModel, error) {
 	var users []*model.UserModel
+
 	results := userRepo.db.Preload("UserType", func(db *gorm.DB) *gorm.DB {
 		return db.Select("id", "name", "is_active")
 	}).Preload("Profile", func(db *gorm.DB) *gorm.DB {
-		return db.Select("id", "user_id", "first_name", "last_name")
+		return db.Select("id", "user_id", "first_name", "last_name", "phone")
 	}).Where("is_active = ?", true).Where("user_type_id = ?", constants.SUPERADMIN_USER_ROLE).Order("users.created_at DESC").Select("users.id", "email", "users.is_active", "users.created_at", "user_type_id").Find(&users)
+
 	if results.Error != nil {
 		return nil, results.Error
 	}
+
 	return users, nil
 }
 

@@ -12,9 +12,9 @@ import (
 // TO-DO
 // add middleware later
 func NewUserHandler(user fiber.Router, userService interfaces.UserService) {
-	user.Post("/store", middlewares.CheckAuthorization, AddNewUser(userService))
-	user.Get("/all", middlewares.CheckAuthorization, GetAllSuperadminUsers(userService))
-	// user.Post("/login", Login(userService))
+	user.Post("/store", AddNewUser(userService))
+	user.Get("/superadmin/all", middlewares.CheckAuthorization, GetAllSuperadminUsers(userService))
+	user.Post("/login", Login(userService))
 	// bank.Get("/get/:id", middlewares.CheckAuthorization, GetBankById(userService))
 	// bank.Patch("/update", middlewares.CheckAuthorization, UpdateBank(userService))
 	// user.Delete("/delete", middlewares.CheckAuthorization, DeleteUser(userService))
@@ -25,11 +25,12 @@ func NewUserHandler(user fiber.Router, userService interfaces.UserService) {
 func AddNewUser(userService interfaces.UserService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		userDTO := &entity.UserRequestDTO{
-			Email:     c.FormValue("email"),
-			Password:  c.FormValue("password"),
-			FirstName: c.FormValue("firstname"),
-			LastName:  c.FormValue("lastname"),
-			Phone:     c.FormValue("phone"),
+			Email:      c.FormValue("email"),
+			Password:   c.FormValue("password"),
+			FirstName:  c.FormValue("firstname"),
+			LastName:   c.FormValue("lastname"),
+			Phone:      c.FormValue("phone"),
+			UserTypeId: c.FormValue("user_type_id"),
 		}
 
 		if err := c.BodyParser(userDTO); err != nil {
@@ -57,6 +58,33 @@ func GetAllSuperadminUsers(userService interfaces.UserService) fiber.Handler {
 			return config.ErrorResponse(err, c)
 		}
 		return config.AppResponse(getAllUsers, c)
+	}
+}
+
+// Login is to get all users data
+func Login(userService interfaces.UserService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		userLoginDTO := &entity.UserLoginRequestDTO{
+			Email:    c.FormValue("email"),
+			Password: c.FormValue("password"),
+		}
+
+		if err := c.BodyParser(userLoginDTO); err != nil {
+			return config.ErrorResponse(err, c)
+		}
+
+		validationErr := config.ValidateFields(*userLoginDTO)
+		if validationErr != nil {
+			return config.ValidateResponse(validationErr, c)
+		}
+
+		userLogin, err := userService.LoginUser(userLoginDTO)
+		config.PrettyPrint(err)
+		if err != nil {
+			return config.ErrorResponse(err, c)
+		}
+
+		return config.AppResponse(userLogin, c)
 	}
 }
 
@@ -175,32 +203,5 @@ func GetAllSuperadminUsers(userService interfaces.UserService) fiber.Handler {
 // 		}
 
 // 		return config.AppResponse(deleteUser, c)
-// 	}
-// }
-
-// // Login is to get all users data
-// func Login(userService interfaces.UserService) fiber.Handler {
-// 	return func(c *fiber.Ctx) error {
-// 		userLoginDTO := &entity.UserLoginRequestDTO{
-// 			Email:    c.FormValue("email"),
-// 			Password: c.FormValue("password"),
-// 		}
-
-// 		if err := c.BodyParser(userLoginDTO); err != nil {
-// 			return config.ErrorResponse(err, c)
-// 		}
-
-// 		validationErr := config.ValidateFields(*userLoginDTO)
-// 		if validationErr != nil {
-// 			return config.ValidateResponse(validationErr, c)
-// 		}
-
-// 		_, err := userService.LoginUser(userLoginDTO)
-
-// 		if err != nil {
-// 			return config.ErrorResponse(err, c)
-// 		}
-
-// 		return config.AppResponse(nil, c)
 // 	}
 // }

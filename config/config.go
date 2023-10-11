@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -36,7 +37,7 @@ func AppResponse(data interface{}, ctx *fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(&DefaultResponse{
 		Success: true,
 		Data:    data,
-		Errors:  "",
+		Errors:  nil,
 	})
 }
 
@@ -64,8 +65,13 @@ func ErrorResponse(err error, ctx *fiber.Ctx) error {
 		errType = fiber.StatusUnprocessableEntity
 	}
 
+	if strings.Contains(errMessage, "incorrect") {
+		errType = fiber.StatusOK
+	}
+
 	if errType == fiber.StatusInternalServerError {
-		errMessage = "Something went wrong"
+		fmt.Println(errMessage)
+		errMessage = "something went wrong"
 	}
 
 	return ctx.Status(errType).JSON(&DefaultResponse{
