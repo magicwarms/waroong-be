@@ -70,25 +70,30 @@ func (userRepo *userRepository) GetAllSuperadminUsers() ([]*model.UserModel, err
 }
 
 // GetById is to get only one user data by ID
-func (userRepo *userRepository) GetById(id uint) (*model.UserModel, error) {
+func (userRepo *userRepository) GetById(userId uint) (*model.UserModel, error) {
 	var user model.UserModel
-	result := userRepo.db.First(&user, "id = ?", id)
+	result := userRepo.db.Preload("UserType", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id", "name", "is_active")
+	}).Preload("Profile").Select("users.id", "email", "password", "users.is_active", "user_type_id").Where("id = ?", userId).Take(&user)
+
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return &model.UserModel{}, nil
+		return &model.UserModel{}, result.Error
 	}
+
 	if result.Error != nil {
 		return &model.UserModel{}, result.Error
 	}
+
 	return &user, nil
 }
 
-// // Update is to update user data based on user input
-// func (userRepo *userRepository) Update(user *model.UserModel) error {
-// 	if err := userRepo.db.Select("password").Updates(&user).Error; err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
+// Update is to update user data based on user input
+func (userRepo *userRepository) UpdateUserPassword(userId uint, password string) error {
+	if err := userRepo.db.Select("password").Updates(&model.UserModel{ID: userId, Password: password}).Error; err != nil {
+		return err
+	}
+	return nil
+}
 
 // Delete is to delete user based on user input
 func (userRepo *userRepository) Delete(id uint) (bool, error) {

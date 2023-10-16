@@ -10,12 +10,12 @@ type UserRequestDTO struct {
 }
 
 type UserUpdateRequestDTO struct {
-	ID       string `validate:"required"`
+	ID       string `validate:"required,number,min=1"`
 	Password string `validate:"required,alphanum,min=8"`
 }
 
 type UserGetIDRequestDTO struct {
-	ID uint `validate:"required"`
+	ID string `validate:"required,number,min=1"`
 }
 
 type CustomerRequestDTO struct {
@@ -26,15 +26,20 @@ type CustomerRequestDTO struct {
 }
 
 type CustomerUpdateRequestDTO struct {
-	ID       string `validate:"required"`
+	ID       string `validate:"required,number,min=1"`
 	Password string `validate:"required,alphanum,min=8"`
 }
 
 type CustomerGetIDRequestDTO struct {
-	ID uint `validate:"required"`
+	ID uint `validate:"required,number,min=1"`
 }
 
 type UserLoginRequestDTO struct {
 	Email    string `validate:"required,email,min=4,max=64"`
+	Password string `validate:"required,alphanum,min=8"`
+}
+
+type ChangePasswordUserDTO struct {
+	UserID   string `validate:"required,number,min=1"`
 	Password string `validate:"required,alphanum,min=8"`
 }

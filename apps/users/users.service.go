@@ -2,6 +2,7 @@ package users
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 	profileModel "waroong-be/apps/user_profiles/model"
@@ -12,7 +13,7 @@ import (
 	"waroong-be/apps/utils"
 	"waroong-be/config"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type userService struct {
@@ -85,7 +86,6 @@ func (s *userService) LoginUser(userLogin *entity.UserLoginRequestDTO) (*entity.
 	claims := jwt.MapClaims{
 		"id":         user.ID,
 		"userTypeId": user.UserType.ID,
-		"email":      user.Email,
 		"expiresAt":  time.Now().Local().Add(time.Hour * time.Duration(72)).Unix(), //3 days
 	}
 
@@ -109,42 +109,42 @@ func (s *userService) LoginUser(userLogin *entity.UserLoginRequestDTO) (*entity.
 
 }
 
-// // StoreCustomer is a service layer that helps insert customer data to database
-// func (s *userService) StoreCustomer(user *entity.UserRequestDTO) error {
+// GetUserById is a service layer that helps get user by id
+func (s *userService) GetUserById(userId uint) (*model.UserModel, error) {
+	getUser, err := s.userRepository.GetById(userId)
+	if err != nil {
+		return &model.UserModel{}, err
+	}
+	return getUser, nil
+}
 
-// 	checkEmail, _ := s.userRepository.GetUserByEmail(user.Email, constants.CUSTOMER_USER_ROLE)
-// 	if checkEmail.Email != "" {
-// 		return errors.New("email already existed")
-// 	}
+func (s *userService) UpdateUserPassword(data *entity.ChangePasswordUserDTO) error {
+	parseUserId, errParseUserId := strconv.ParseUint(data.UserID, 10, 64)
+	if errParseUserId != nil {
+		return errors.New(errParseUserId.Error())
+	}
 
-// 	// start to insert the data to database through repository
-// 	errSave := s.userRepository.Save(&model.UserModel{
-// 		Email:      user.Email,
-// 		Password:   user.Password,
-// 		UserTypeID: constants.SUPERADMIN_USER_ROLE,
-// 		Profile: profileModel.UserProfileModel{
-// 			FirstName: user.FirstName,
-// 			LastName:  user.LastName,
-// 			Phone:     user.Phone,
-// 		},
-// 	})
+	getUser, err := s.userRepository.GetById(uint(parseUserId))
+	if err != nil {
+		return err
+	}
 
-// 	if errSave != nil {
-// 		return errSave
-// 	}
+	hashedPassword, errHashPassword := utils.HashPassword(data.Password)
+	if errHashPassword != nil {
+		return errHashPassword
+	}
+	newUserPassword := string(hashedPassword)
 
-// 	return nil
+	fmt.Println(newUserPassword)
 
-// }
+	errUpdatePassword := s.userRepository.UpdateUserPassword(getUser.ID, newUserPassword)
 
-// // GetBankById is a service layer that helps get book data
-// func (s *bankService) GetBankById(id string) (*model.BankModel, error) {
-// 	getBank, err := s.bankRepository.GetById(id)
-// 	if err != nil {
-// 		return &model.BankModel{}, err
-// 	}
-// 	return getBank, nil
-// }
+	if errUpdatePassword != nil {
+		return err
+	}
+
+	return nil
+}
 
 // // UpdateBank is a service layer that helps update bank data to database
 // func (s *bankService) UpdateBank(bank *entity.BankUpdateRequestDTO) error {

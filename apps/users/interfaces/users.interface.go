@@ -10,8 +10,8 @@ type UserService interface {
 	StoreUser(user *entity.UserRequestDTO) error
 	FindAllSuperadminUsers() ([]*model.UserModel, error)
 	LoginUser(user *entity.UserLoginRequestDTO) (*entity.LoginUserResponse, error)
-	// // UpdatePasswordUser(user *entity.UserUpdateRequestDTO) error
-	// // GetUserById(id string) (*model.UserModel, error)
+	UpdateUserPassword(user *entity.ChangePasswordUserDTO) error
+	GetUserById(id uint) (*model.UserModel, error)
 
 	// DeleteUser(id uint) (bool, error)
 }
@@ -21,7 +21,8 @@ type UserRepository interface {
 	Store(user *model.UserModel) error
 	GetAllSuperadminUsers() ([]*model.UserModel, error)
 	GetUserByEmail(email string) (*model.UserModel, error)
-	// GetById(id uint) (*model.UserModel, error)
+	GetById(id uint) (*model.UserModel, error)
+	UpdateUserPassword(userId uint, password string) error
 	// Update(bank *model.UserModel) error
 
 	// Delete(id uint) (bool, error)

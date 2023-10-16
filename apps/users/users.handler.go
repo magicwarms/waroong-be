@@ -1,6 +1,8 @@
 package users
 
 import (
+	"errors"
+	"strconv"
 	"waroong-be/apps/middlewares"
 	"waroong-be/apps/users/entity"
 	"waroong-be/apps/users/interfaces"
@@ -9,13 +11,12 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// TO-DO
-// add middleware later
 func NewUserHandler(user fiber.Router, userService interfaces.UserService) {
 	user.Post("/store", AddNewUser(userService))
-	user.Get("/superadmin/all", middlewares.CheckAuthorization, GetAllSuperadminUsers(userService))
+	user.Get("/superadmin/all", middlewares.CheckSuperadminAuthorization, GetAllSuperadminUsers(userService))
 	user.Post("/login", Login(userService))
-	// bank.Get("/get/:id", middlewares.CheckAuthorization, GetBankById(userService))
+	user.Get("/profile", middlewares.CheckAuthorization, GetUserProfile(userService))
+	user.Patch("/superadmin/change_password/user", middlewares.CheckSuperadminAuthorization, ChangeUserPassword(userService))
 	// bank.Patch("/update", middlewares.CheckAuthorization, UpdateBank(userService))
 	// user.Delete("/delete", middlewares.CheckAuthorization, DeleteUser(userService))
 	// user.Post("/customer/store", middlewares.CheckAuthorization, AddNewCustomer(userService))
@@ -79,7 +80,7 @@ func Login(userService interfaces.UserService) fiber.Handler {
 		}
 
 		userLogin, err := userService.LoginUser(userLoginDTO)
-		config.PrettyPrint(err)
+
 		if err != nil {
 			return config.ErrorResponse(err, c)
 		}
@@ -88,58 +89,63 @@ func Login(userService interfaces.UserService) fiber.Handler {
 	}
 }
 
-// // AddNewUser is store user data into database
-// func AddNewCustomer(userService interfaces.UserService) fiber.Handler {
-// 	return func(c *fiber.Ctx) error {
-// 		userDTO := &entity.UserRequestDTO{
-// 			Email:     c.FormValue("email"),
-// 			Password:  c.FormValue("password"),
-// 			FirstName: c.FormValue("firstname"),
-// 			LastName:  c.FormValue("lastname"),
-// 		}
+// GetUserProfile is to get spesific user data by user ID
+func GetUserProfile(userService interfaces.UserService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// get userId from token payload
+		userId := c.GetRespHeader("userId")
 
-// 		if err := c.BodyParser(userDTO); err != nil {
-// 			return config.ErrorResponse(err, c)
-// 		}
+		parseUserId, errParseUserId := strconv.ParseUint(userId, 10, 64)
+		if errParseUserId != nil {
+			return errors.New(errParseUserId.Error())
+		}
 
-// 		validationErr := config.ValidateFields(*userDTO)
-// 		if validationErr != nil {
-// 			return config.ValidateResponse(validationErr, c)
-// 		}
+		userIdDTO := &entity.UserGetIDRequestDTO{
+			ID: userId,
+		}
 
-// 		err := userService.StoreUser(userDTO)
-// 		if err != nil {
-// 			return config.ErrorResponse(err, c)
-// 		}
-// 		return config.AppResponse(nil, c)
-// 	}
-// }
+		validationErr := config.ValidateFields(*userIdDTO)
+		if validationErr != nil {
+			return config.ValidateResponse(validationErr, c)
+		}
 
-// // GetBankById is to get spesific bank data by bank ID
-// func GetBankById(bankService interfaces.BankService) fiber.Handler {
-// 	return func(c *fiber.Ctx) error {
-// 		// get bankId from header value
-// 		var id string = c.Params("id")
+		user, err := userService.GetUserById(uint(parseUserId))
+		if err != nil {
+			return config.ErrorResponse(err, c)
+		}
+		if user.Email == "" {
+			user = nil
+		}
+		return config.AppResponse(&user, c)
+	}
+}
 
-// 		bankDTO := &entity.BankGetIDRequestDTO{
-// 			ID: id,
-// 		}
+func ChangeUserPassword(userService interfaces.UserService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		changeUserPasswordDTO := &entity.ChangePasswordUserDTO{
+			UserID:   c.FormValue("user_id"),
+			Password: c.FormValue("password"),
+		}
 
-// 		validationErr := config.ValidateFields(*bankDTO)
-// 		if validationErr != nil {
-// 			return config.ValidateResponse(validationErr, c)
-// 		}
+		if err := c.BodyParser(changeUserPasswordDTO); err != nil {
+			return config.ErrorResponse(err, c)
+		}
 
-// 		getBank, err := bankService.GetBankById(id)
-// 		if err != nil {
-// 			return config.ErrorResponse(err, c)
-// 		}
-// 		if getBank.ID == "" {
-// 			getBank = nil
-// 		}
-// 		return config.AppResponse(&getBank, c)
-// 	}
-// }
+		validationErr := config.ValidateFields(*changeUserPasswordDTO)
+		if validationErr != nil {
+			return config.ValidateResponse(validationErr, c)
+		}
+
+		err := userService.UpdateUserPassword(changeUserPasswordDTO)
+
+		if err != nil {
+			return config.ErrorResponse(err, c)
+		}
+
+		return config.AppResponse(nil, c)
+
+	}
+}
 
 // // UpdateBank is update user data into database
 // func UpdateBank(bankService interfaces.BankService) fiber.Handler {

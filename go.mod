@@ -23,6 +23,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/gofiber/fiber/v2 v2.49.2
 	github.com/golang-jwt/jwt v3.2.2+incompatible
+	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/google/uuid v1.3.1 // indirect
 	github.com/joho/godotenv v1.5.1
 	github.com/klauspost/compress v1.17.0 // indirect
