@@ -19,7 +19,7 @@ func NewUserHandler(user fiber.Router, userService interfaces.UserService) {
 	user.Patch("/superadmin/change_password/user", middlewares.CheckSuperadminAuthorization, ChangeUserPassword(userService))
 	// bank.Patch("/update", middlewares.CheckAuthorization, UpdateBank(userService))
 	// user.Delete("/delete", middlewares.CheckAuthorization, DeleteUser(userService))
-	// user.Post("/customer/store", middlewares.CheckAuthorization, AddNewCustomer(userService))
+	user.Post("/forgot_password", ForgotPasswordUser(userService))
 }
 
 // AddNewUser is store user superadmin data into database
@@ -144,6 +144,30 @@ func ChangeUserPassword(userService interfaces.UserService) fiber.Handler {
 
 		return config.AppResponse(nil, c)
 
+	}
+}
+
+// ForgotPasswordUser is store user superadmin data into database
+func ForgotPasswordUser(userService interfaces.UserService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		forgotPasswordDTO := &entity.ForgotPasswordRequestDTO{
+			Email: c.FormValue("email"),
+		}
+
+		if err := c.BodyParser(forgotPasswordDTO); err != nil {
+			return config.ErrorResponse(err, c)
+		}
+
+		validationErr := config.ValidateFields(*forgotPasswordDTO)
+		if validationErr != nil {
+			return config.ValidateResponse(validationErr, c)
+		}
+
+		forgotPassword, err := userService.ForgotPassword(forgotPasswordDTO)
+		if err != nil {
+			return config.ErrorResponse(err, c)
+		}
+		return config.AppResponse(forgotPassword, c)
 	}
 }
 

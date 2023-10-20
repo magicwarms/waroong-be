@@ -14,6 +14,7 @@ import (
 	"waroong-be/config"
 
 	"github.com/golang-jwt/jwt/v5"
+	mail "github.com/xhit/go-simple-mail/v2"
 )
 
 type userService struct {
@@ -144,6 +145,56 @@ func (s *userService) UpdateUserPassword(data *entity.ChangePasswordUserDTO) err
 	}
 
 	return nil
+}
+
+func (s *userService) ForgotPassword(userData *entity.ForgotPasswordRequestDTO) (bool, error) {
+	user, errGetUserEmail := s.userRepository.GetUserByEmail(userData.Email)
+
+	if errGetUserEmail != nil {
+		return false, errors.New("email didn't registered")
+	}
+
+	forgotPasswordToken := utils.GenerateRandomStringBytes(20)
+
+	go s.userRepository.UpdateForgotPasswordUserToken(user.ID, forgotPasswordToken)
+
+	templateData := struct {
+		Name  string
+		Token string
+	}{
+		Name:  user.Profile.FirstName + " " + user.Profile.LastName,
+		Token: forgotPasswordToken,
+	}
+
+	htmlFile, errHtmlFile := config.ParseHtmlTemplate("forgot_password.html", templateData)
+
+	if errHtmlFile != nil {
+		return false, errHtmlFile
+	}
+
+	email := mail.NewMSG()
+	email.SetFrom(config.GoDotEnvVariable("MAIL_FROM_NAME") + " <" + config.GoDotEnvVariable("MAIL_FROM_ADDRESS") + ">")
+	email.AddTo(user.Email)
+	email.SetSubject("Forgot Password - " + config.GoDotEnvVariable("MAIL_FROM_NAME"))
+	email.SetBody(mail.TextHTML, htmlFile)
+
+	if email.Error != nil {
+		return false, email.Error
+	}
+
+	configEmail, errConfigEmail := config.EmailServer()
+	if errConfigEmail != nil {
+		return false, errConfigEmail
+	}
+
+	sendEmailError := email.Send(configEmail)
+	if sendEmailError != nil {
+		fmt.Println("sendEmailError", sendEmailError)
+		return false, sendEmailError
+	}
+
+	return true, nil
+
 }
 
 // // UpdateBank is a service layer that helps update bank data to database

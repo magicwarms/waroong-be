@@ -43,3 +43,7 @@ type ChangePasswordUserDTO struct {
 	UserID   string `validate:"required,number,min=1"`
 	Password string `validate:"required,alphanum,min=8"`
 }
+
+type ForgotPasswordRequestDTO struct {
+	Email string `validate:"required,email,min=4,max=64"`
+}

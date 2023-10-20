@@ -12,6 +12,7 @@ type UserService interface {
 	LoginUser(user *entity.UserLoginRequestDTO) (*entity.LoginUserResponse, error)
 	UpdateUserPassword(user *entity.ChangePasswordUserDTO) error
 	GetUserById(id uint) (*model.UserModel, error)
+	ForgotPassword(user *entity.ForgotPasswordRequestDTO) (bool, error)
 
 	// DeleteUser(id uint) (bool, error)
 }
@@ -23,6 +24,7 @@ type UserRepository interface {
 	GetUserByEmail(email string) (*model.UserModel, error)
 	GetById(id uint) (*model.UserModel, error)
 	UpdateUserPassword(userId uint, password string) error
+	UpdateForgotPasswordUserToken(userId uint, password string) error
 	// Update(bank *model.UserModel) error
 
 	// Delete(id uint) (bool, error)

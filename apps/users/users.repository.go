@@ -38,7 +38,7 @@ func (userRepo *userRepository) GetUserByEmail(email string) (*model.UserModel, 
 	result := userRepo.db.Preload("UserType", func(db *gorm.DB) *gorm.DB {
 		return db.Select("id")
 	}).Preload("Profile", func(db *gorm.DB) *gorm.DB {
-		return db.Select("id", "user_id")
+		return db.Select("id", "user_id", "first_name", "last_name")
 	}).Select("users.id", "email", "password", "users.is_active", "user_type_id").Where("email = ?", email).Take(&user)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -90,6 +90,14 @@ func (userRepo *userRepository) GetById(userId uint) (*model.UserModel, error) {
 // Update is to update user data based on user input
 func (userRepo *userRepository) UpdateUserPassword(userId uint, password string) error {
 	if err := userRepo.db.Select("password").Updates(&model.UserModel{ID: userId, Password: password}).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+// Update is to update user data based on user input
+func (userRepo *userRepository) UpdateForgotPasswordUserToken(userId uint, token string) error {
+	if err := userRepo.db.Select("forgot_password_token").Updates(&model.UserModel{ID: userId, ForgotPasswordToken: token}).Error; err != nil {
 		return err
 	}
 	return nil
