@@ -32,8 +32,8 @@ func InitDatabase() *gorm.DB {
 	} else if appEnv == "staging" {
 		logLvl = logger.Warn
 	} else {
-		// logLvl = logger.Info
-		logLvl = logger.Warn
+		logLvl = logger.Info
+		// logLvl = logger.Warn
 	}
 	dbLogger := logger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
@@ -66,8 +66,8 @@ func InitDatabase() *gorm.DB {
 	// Ping
 	errSqlPing := sqlDB.Ping()
 	if errSqlPing != nil {
-		log.Panic(errSqlPing)
-		panic(errSqlPing)
+		fmt.Println(errSqlPing)
+		panic("failed to connect database")
 	}
 
 	// SetMaxIdleConns sets the maximum number of connections in the idle connection pool.
