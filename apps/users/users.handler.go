@@ -16,16 +16,17 @@ func NewUserHandler(user fiber.Router, userService interfaces.UserService) {
 	user.Get("/superadmin/all", middlewares.CheckSuperadminAuthorization, GetAllSuperadminUsers(userService))
 	user.Post("/login", Login(userService))
 	user.Get("/profile", middlewares.CheckAuthorization, GetUserProfile(userService))
-	user.Patch("/superadmin/change_password/user", middlewares.CheckSuperadminAuthorization, ChangeUserPassword(userService))
-	// bank.Patch("/update", middlewares.CheckAuthorization, UpdateBank(userService))
+	user.Patch("/superadmin/change_password/user", middlewares.CheckSuperadminAuthorization, ChangeSuperadminPassword(userService))
+	user.Patch("/update", middlewares.CheckAuthorization, UpdateUser(userService))
 	// user.Delete("/delete", middlewares.CheckAuthorization, DeleteUser(userService))
 	user.Post("/forgot_password", ForgotPasswordUser(userService))
+	user.Patch("/change_forgot_password", ChangeForgotPasswordUser(userService))
 }
 
 // AddNewUser is store user superadmin data into database
 func AddNewUser(userService interfaces.UserService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		userDTO := &entity.UserRequestDTO{
+		userDTO := &entity.AddUserRequestDTO{
 			Email:      c.FormValue("email"),
 			Password:   c.FormValue("password"),
 			FirstName:  c.FormValue("firstname"),
@@ -44,6 +45,33 @@ func AddNewUser(userService interfaces.UserService) fiber.Handler {
 		}
 
 		err := userService.StoreUser(userDTO)
+		if err != nil {
+			return config.ErrorResponse(err, c)
+		}
+		return config.AppResponse(nil, c)
+	}
+}
+
+// UpdateUser is update user data into database
+func UpdateUser(userService interfaces.UserService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		userUpdateDTO := &entity.UpdateUserRequestDTO{
+			ID:        c.GetRespHeader("userId"),
+			FirstName: c.FormValue("firstname"),
+			LastName:  c.FormValue("lastname"),
+			Phone:     c.FormValue("phone"),
+		}
+
+		if err := c.BodyParser(userUpdateDTO); err != nil {
+			return config.ErrorResponse(err, c)
+		}
+
+		validationErr := config.ValidateFields(*userUpdateDTO)
+		if validationErr != nil {
+			return config.ValidateResponse(validationErr, c)
+		}
+
+		err := userService.UpdateUser(userUpdateDTO)
 		if err != nil {
 			return config.ErrorResponse(err, c)
 		}
@@ -120,10 +148,13 @@ func GetUserProfile(userService interfaces.UserService) fiber.Handler {
 	}
 }
 
-func ChangeUserPassword(userService interfaces.UserService) fiber.Handler {
+func ChangeSuperadminPassword(userService interfaces.UserService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		// get userId from token payload
+		userId := c.GetRespHeader("userId")
+
 		changeUserPasswordDTO := &entity.ChangePasswordUserDTO{
-			UserID:   c.FormValue("user_id"),
+			UserID:   userId,
 			Password: c.FormValue("password"),
 		}
 
@@ -136,7 +167,7 @@ func ChangeUserPassword(userService interfaces.UserService) fiber.Handler {
 			return config.ValidateResponse(validationErr, c)
 		}
 
-		err := userService.UpdateUserPassword(changeUserPasswordDTO)
+		err := userService.UpdateSuperadminPassword(changeUserPasswordDTO)
 
 		if err != nil {
 			return config.ErrorResponse(err, c)
@@ -164,6 +195,31 @@ func ForgotPasswordUser(userService interfaces.UserService) fiber.Handler {
 		}
 
 		forgotPassword, err := userService.ForgotPassword(forgotPasswordDTO)
+		if err != nil {
+			return config.ErrorResponse(err, c)
+		}
+		return config.AppResponse(forgotPassword, c)
+	}
+}
+
+// ChangeForgotPasswordUser is to change the user password after forgot password
+func ChangeForgotPasswordUser(userService interfaces.UserService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		changeForgotPasswordDTO := &entity.ChangeForgotPasswordRequestDTO{
+			Password: c.FormValue("password"),
+			Token:    c.FormValue("token"),
+		}
+
+		if err := c.BodyParser(changeForgotPasswordDTO); err != nil {
+			return config.ErrorResponse(err, c)
+		}
+
+		validationErr := config.ValidateFields(*changeForgotPasswordDTO)
+		if validationErr != nil {
+			return config.ValidateResponse(validationErr, c)
+		}
+
+		forgotPassword, err := userService.ChangeForgotPassword(changeForgotPasswordDTO)
 		if err != nil {
 			return config.ErrorResponse(err, c)
 		}

@@ -3,7 +3,10 @@ package middlewares
 import (
 	"errors"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
+	"time"
 	"waroong-be/apps/constants"
 	"waroong-be/config"
 
@@ -47,8 +50,20 @@ func CheckSuperadminAuthorization(ctx *fiber.Ctx) error {
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		// get the payloads
 		id := claims["id"]
-
 		userTypeId := claims["userTypeId"]
+		expiresAt := claims["expiresAt"]
+
+		// Parse the input string as a float64
+		parseFloat, errParseFloat := strconv.ParseFloat(fmt.Sprint(expiresAt), 64)
+		if errParseFloat != nil {
+			fmt.Println("errParseFloat:", errParseFloat)
+			return config.ErrorResponse(errParseFloat, ctx)
+		}
+
+		isExpires := checkAuthorizationExpired(parseFloat, ctx)
+		if isExpires {
+			return config.ErrorResponse(errors.New("token has expired"), ctx)
+		}
 
 		if fmt.Sprint(userTypeId) != fmt.Sprint(constants.SUPERADMIN_USER_ROLE) {
 			return config.ErrorResponse(errors.New("you don't have enough permission"), ctx)
@@ -74,10 +89,31 @@ func CheckAuthorization(ctx *fiber.Ctx) error {
 		// get the payloads
 		id := claims["id"]
 		userTypeId := claims["userTypeId"]
+		expiresAt := claims["expiresAt"]
+
+		// Parse the input string as a float64
+		parseFloat, errParseFloat := strconv.ParseFloat(fmt.Sprint(expiresAt), 64)
+		if errParseFloat != nil {
+			fmt.Println("errParseFloat:", errParseFloat)
+			return config.ErrorResponse(errParseFloat, ctx)
+		}
+
+		isExpires := checkAuthorizationExpired(parseFloat, ctx)
+		if isExpires {
+			return config.ErrorResponse(errors.New("token has expired"), ctx)
+		}
 		// set the value into header
 		ctx.Set("userId", fmt.Sprint(id))
 		ctx.Set("userTypeId", fmt.Sprint(userTypeId))
 	}
 
 	return ctx.Next()
+}
+
+func checkAuthorizationExpired(parseFloat float64, ctx *fiber.Ctx) bool {
+	// Convert float64 to integer
+	timestamp := int64(math.Round(parseFloat))
+	timeNow := time.Now().Local().Unix()
+
+	return timeNow > timestamp
 }

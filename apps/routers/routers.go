@@ -19,11 +19,12 @@ func Dispatch(DBConnection *gorm.DB, apiV1 fiber.Router) {
 	// REPOSITORIES
 	userRepo := users.NewRepo(DBConnection)
 	userTypeRepo := user_types.NewRepo(DBConnection)
-	user_profiles.NewRepo(DBConnection)
+	userProfileRepo := user_profiles.NewRepo(DBConnection)
 
 	// SERVICES
 	userTypeService := user_types.NewService(userTypeRepo)
-	userService := users.NewService(userRepo, userTypeService)
+	userProfileService := user_profiles.NewService(userProfileRepo)
+	userService := users.NewService(userRepo, userTypeService, userProfileService)
 
 	// HANDLERS
 	users.NewUserHandler(apiV1.Group("/users"), userService)

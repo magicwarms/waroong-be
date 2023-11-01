@@ -46,10 +46,14 @@ func ErrorResponse(err error, ctx *fiber.Ctx) error {
 	errMessage := err.Error()
 
 	errType := fiber.StatusInternalServerError
-	isSuccess := false
+	isSuccess := true
 
 	if strings.Contains(errMessage, "existed") {
 		errType = fiber.StatusConflict
+	}
+
+	if strings.Contains(errMessage, "exists") {
+		errType = fiber.StatusNotFound
 	}
 
 	if strings.Contains(errMessage, "signature") || strings.Contains(errMessage, "authorization") {
@@ -58,20 +62,25 @@ func ErrorResponse(err error, ctx *fiber.Ctx) error {
 
 	if strings.Contains(errMessage, "not found") {
 		errType = fiber.StatusOK
-		isSuccess = true
 	}
 
 	if strings.Contains(errMessage, "Unprocessable Entity") {
 		errType = fiber.StatusUnprocessableEntity
+		isSuccess = false
 	}
 
 	if strings.Contains(errMessage, "incorrect") {
 		errType = fiber.StatusOK
 	}
 
+	if strings.Contains(errMessage, "expired") {
+		errType = fiber.StatusUnauthorized
+	}
+
 	if errType == fiber.StatusInternalServerError {
 		fmt.Println(errMessage)
 		errMessage = "something went wrong"
+		isSuccess = false
 	}
 
 	return ctx.Status(errType).JSON(&DefaultResponse{
@@ -143,7 +152,7 @@ func messageForTag(tag, value, field string) string {
 	case "numeric":
 		return field + value + " harus berupa angka"
 	case "alpha":
-		return field + value + " harus berupa huruf saja"
+		return field + value + " harus berupa huruf saja dan tidak ada spasi"
 	case "alphanum":
 		return field + " harus berupa angka dan huruf"
 	}

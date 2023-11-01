@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+	userProfileEntity "waroong-be/apps/user_profiles/entity"
+	userProfileInterfaces "waroong-be/apps/user_profiles/interfaces"
 	profileModel "waroong-be/apps/user_profiles/model"
 	userTypeInterfaces "waroong-be/apps/user_types/interfaces"
 	"waroong-be/apps/users/entity"
@@ -14,24 +16,27 @@ import (
 	"waroong-be/config"
 
 	"github.com/golang-jwt/jwt/v5"
-	mail "github.com/xhit/go-simple-mail/v2"
+
+	mailjet "github.com/mailjet/mailjet-apiv3-go"
 )
 
 type userService struct {
-	userRepository  interfaces.UserRepository
-	userTypeService userTypeInterfaces.UserTypeService
+	userRepository     interfaces.UserRepository
+	userTypeService    userTypeInterfaces.UserTypeService
+	userProfileService userProfileInterfaces.UserProfileService
 }
 
 // NewService is used to create a single instance of the service
-func NewService(r interfaces.UserRepository, userTypeService userTypeInterfaces.UserTypeService) interfaces.UserService {
+func NewService(r interfaces.UserRepository, userTypeService userTypeInterfaces.UserTypeService, userProfileService userProfileInterfaces.UserProfileService) interfaces.UserService {
 	return &userService{
-		userRepository:  r,
-		userTypeService: userTypeService,
+		userRepository:     r,
+		userTypeService:    userTypeService,
+		userProfileService: userProfileService,
 	}
 }
 
-// SaveBank is a service layer that helps insert user admin data to database
-func (s *userService) StoreUser(user *entity.UserRequestDTO) error {
+// StoreUser is a service layer that helps insert user data to database
+func (s *userService) StoreUser(user *entity.AddUserRequestDTO) error {
 
 	checkEmail, _ := s.userRepository.GetUserByEmail(user.Email)
 	if checkEmail.Email != "" {
@@ -62,6 +67,32 @@ func (s *userService) StoreUser(user *entity.UserRequestDTO) error {
 	return nil
 }
 
+// UpdateUser is a service layer that helps update user data to database
+func (s *userService) UpdateUser(user *entity.UpdateUserRequestDTO) error {
+	parseUserId, errParseUserId := strconv.ParseUint(user.ID, 10, 64)
+	if errParseUserId != nil {
+		return errParseUserId
+	}
+
+	checkUser, _ := s.userRepository.GetById(uint(parseUserId))
+	if checkUser.Email == "" {
+		return errors.New("the user doesn't exists")
+	}
+
+	errUpdate := s.userProfileService.UpdateUserProfile(&userProfileEntity.UpdateUserRequestDTO{
+		ID:        uint(checkUser.Profile.ID),
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		Phone:     user.Phone,
+	})
+
+	if errUpdate != nil {
+		return errUpdate
+	}
+
+	return nil
+}
+
 // FindAllSuperadminUsers is a service layer that helps fetch all banks in Banks table
 func (s *userService) FindAllSuperadminUsers() ([]*model.UserModel, error) {
 	getAllUsers, err := s.userRepository.GetAllSuperadminUsers()
@@ -75,12 +106,12 @@ func (s *userService) LoginUser(userLogin *entity.UserLoginRequestDTO) (*entity.
 	user, errGetUserEmail := s.userRepository.GetUserByEmail(userLogin.Email)
 
 	if errGetUserEmail != nil {
-		return &entity.LoginUserResponse{}, errors.New("email didn't existed")
+		return &entity.LoginUserResponse{}, errors.New("the email didn't exist")
 	}
 
 	errPasswordIncorrect := utils.VerifyPassword(user.Password, userLogin.Password)
 	if errPasswordIncorrect != nil {
-		return &entity.LoginUserResponse{}, errors.New("password was incorrect")
+		return &entity.LoginUserResponse{}, errors.New("password is incorrect")
 	}
 
 	// Create the Claims
@@ -119,15 +150,15 @@ func (s *userService) GetUserById(userId uint) (*model.UserModel, error) {
 	return getUser, nil
 }
 
-func (s *userService) UpdateUserPassword(data *entity.ChangePasswordUserDTO) error {
+func (s *userService) UpdateSuperadminPassword(data *entity.ChangePasswordUserDTO) error {
 	parseUserId, errParseUserId := strconv.ParseUint(data.UserID, 10, 64)
 	if errParseUserId != nil {
-		return errors.New(errParseUserId.Error())
+		return errParseUserId
 	}
 
-	getUser, err := s.userRepository.GetById(uint(parseUserId))
-	if err != nil {
-		return err
+	getUser, errGetUser := s.userRepository.GetById(uint(parseUserId))
+	if errGetUser != nil {
+		return errGetUser
 	}
 
 	hashedPassword, errHashPassword := utils.HashPassword(data.Password)
@@ -136,12 +167,10 @@ func (s *userService) UpdateUserPassword(data *entity.ChangePasswordUserDTO) err
 	}
 	newUserPassword := string(hashedPassword)
 
-	fmt.Println(newUserPassword)
-
 	errUpdatePassword := s.userRepository.UpdateUserPassword(getUser.ID, newUserPassword)
 
 	if errUpdatePassword != nil {
-		return err
+		return errUpdatePassword
 	}
 
 	return nil
@@ -151,50 +180,82 @@ func (s *userService) ForgotPassword(userData *entity.ForgotPasswordRequestDTO) 
 	user, errGetUserEmail := s.userRepository.GetUserByEmail(userData.Email)
 
 	if errGetUserEmail != nil {
-		return false, errors.New("email didn't registered")
+		return false, errors.New("the email didn't exist")
 	}
 
 	forgotPasswordToken := utils.GenerateRandomStringBytes(20)
 
 	go s.userRepository.UpdateForgotPasswordUserToken(user.ID, forgotPasswordToken)
 
-	templateData := struct {
-		Name  string
-		Token string
-	}{
+	templateData := entity.ForgotPasswordEmailParams{
 		Name:  user.Profile.FirstName + " " + user.Profile.LastName,
 		Token: forgotPasswordToken,
 	}
+	sendEmail, errorSendForgotEmail := sendForgotPasswordEmail(templateData, user)
+	if errorSendForgotEmail != nil {
+		return false, errorSendForgotEmail
+	}
 
+	if sendEmail {
+		fmt.Println("======================EMAIL SUCCESSFULLY SENT TO " + user.Email + " ======================")
+	}
+
+	return true, nil
+
+}
+
+func sendForgotPasswordEmail(templateData entity.ForgotPasswordEmailParams, user *model.UserModel) (bool, error) {
+	userfullName := user.Profile.FirstName + " " + user.Profile.LastName
 	htmlFile, errHtmlFile := config.ParseHtmlTemplate("forgot_password.html", templateData)
 
 	if errHtmlFile != nil {
 		return false, errHtmlFile
 	}
 
-	email := mail.NewMSG()
-	email.SetFrom(config.GoDotEnvVariable("MAIL_FROM_NAME") + " <" + config.GoDotEnvVariable("MAIL_FROM_ADDRESS") + ">")
-	email.AddTo(user.Email)
-	email.SetSubject("Forgot Password - " + config.GoDotEnvVariable("MAIL_FROM_NAME"))
-	email.SetBody(mail.TextHTML, htmlFile)
-
-	if email.Error != nil {
-		return false, email.Error
+	messagesInfo := []mailjet.InfoMessagesV31{
+		{
+			From: &mailjet.RecipientV31{
+				Email: config.GoDotEnvVariable("MJ_EMAIL_SENDER"),
+				Name:  "No-Reply - Beyond Astro",
+			},
+			To: &mailjet.RecipientsV31{
+				mailjet.RecipientV31{
+					Email: user.Email,
+					Name:  userfullName,
+				},
+			},
+			Subject:  "Forgot Password -" + userfullName,
+			HTMLPart: htmlFile,
+		},
 	}
 
-	configEmail, errConfigEmail := config.EmailServer()
-	if errConfigEmail != nil {
-		return false, errConfigEmail
+	emailResponseStatus := config.SendEmail(messagesInfo)
+
+	return emailResponseStatus == "success", nil
+}
+
+func (s *userService) ChangeForgotPassword(user *entity.ChangeForgotPasswordRequestDTO) (bool, error) {
+	userToken, errUserToken := s.userRepository.GetUserForgotPasswordToken(user.Token)
+
+	if errUserToken != nil || userToken == nil {
+		return false, errors.New("token forgot password is incorrect")
 	}
 
-	sendEmailError := email.Send(configEmail)
-	if sendEmailError != nil {
-		fmt.Println("sendEmailError", sendEmailError)
-		return false, sendEmailError
+	hashedPassword, errHashPassword := utils.HashPassword(user.Password)
+	if errHashPassword != nil {
+		return false, errHashPassword
+	}
+	newUserPassword := string(hashedPassword)
+
+	errUpdatePassword := s.userRepository.UpdateUserPassword(userToken.ID, newUserPassword)
+
+	go s.userRepository.UpdateRemoveUserForgotPasswordToken(userToken.ID)
+
+	if errUpdatePassword != nil {
+		return false, errUpdatePassword
 	}
 
 	return true, nil
-
 }
 
 // // UpdateBank is a service layer that helps update bank data to database

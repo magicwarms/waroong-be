@@ -2,56 +2,27 @@ package config
 
 import (
 	"bytes"
-	"crypto/tls"
-	"log"
+	"fmt"
 	"path"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"text/template"
-	"time"
 
-	mail "github.com/xhit/go-simple-mail/v2"
+	mailjet "github.com/mailjet/mailjet-apiv3-go"
 )
 
-func EmailServer() (*mail.SMTPClient, error) {
-	server := mail.NewSMTPClient()
+func SendEmail(messagesInfo []mailjet.InfoMessagesV31) string {
+	mailjetClient := mailjet.NewMailjetClient(GoDotEnvVariable("MJ_APIKEY_PUBLIC"), GoDotEnvVariable("MJ_APIKEY_PRIVATE"))
 
-	parsePort, errParsePort := strconv.Atoi(GoDotEnvVariable("MAIL_PORT"))
-	if errParsePort != nil {
-		return nil, errParsePort
-	}
-	// SMTP Server
-	server.Host = GoDotEnvVariable("MAIL_HOST")
-	server.Port = parsePort
-	server.Username = GoDotEnvVariable("MAIL_USERNAME")
-	server.Password = GoDotEnvVariable("MAIL_PASSWORD")
-	server.Encryption = mail.EncryptionSTARTTLS
-
-	server.Authentication = mail.AuthAuto
-
-	// Variable to keep alive connection
-	server.KeepAlive = false
-
-	// Timeout for connect to SMTP Server
-	server.ConnectTimeout = 10 * time.Second
-
-	// Timeout for send the data and wait respond
-	server.SendTimeout = 10 * time.Second
-
-	// Set TLSConfig to provide custom TLS configuration. For example,
-	// to skip TLS verification (useful for testing):
-	server.TLSConfig = &tls.Config{InsecureSkipVerify: true}
-
-	// SMTP client
-	smtpClient, errSmtpClient := server.Connect()
-
-	if errSmtpClient != nil {
-		log.Fatal(errSmtpClient)
+	messages := mailjet.MessagesV31{Info: messagesInfo}
+	response, err := mailjetClient.SendMailV31(&messages)
+	if err != nil {
+		fmt.Println("sendEmailError", err)
 	}
 
-	return smtpClient, nil
+	fmt.Println("SendEmailResponseStatus", response.ResultsV31[0].Status, "SendEmailResponseMessageId", response.ResultsV31[0].To[0].MessageID)
 
+	return response.ResultsV31[0].Status
 }
 
 func ParseHtmlTemplate(templateFileName string, data interface{}) (string, error) {

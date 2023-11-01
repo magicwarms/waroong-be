@@ -17,3 +17,10 @@ func NewRepo(gormDB *gorm.DB) *userProfileRepository {
 		db: gormDB,
 	}
 }
+
+func (userProfileRepo *userProfileRepository) Update(user *model.UserProfileModel) error {
+	if err := userProfileRepo.db.Select("first_name", "last_name", "phone").Updates(&model.UserProfileModel{ID: user.ID, FirstName: user.FirstName, LastName: user.LastName, Phone: user.Phone}).Error; err != nil {
+		return err
+	}
+	return nil
+}

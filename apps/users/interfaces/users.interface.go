@@ -7,12 +7,14 @@ import (
 
 // UserService is an interface from which our api module can access our repository of all our models
 type UserService interface {
-	StoreUser(user *entity.UserRequestDTO) error
+	StoreUser(user *entity.AddUserRequestDTO) error
+	UpdateUser(user *entity.UpdateUserRequestDTO) error
 	FindAllSuperadminUsers() ([]*model.UserModel, error)
 	LoginUser(user *entity.UserLoginRequestDTO) (*entity.LoginUserResponse, error)
-	UpdateUserPassword(user *entity.ChangePasswordUserDTO) error
+	UpdateSuperadminPassword(user *entity.ChangePasswordUserDTO) error
 	GetUserById(id uint) (*model.UserModel, error)
 	ForgotPassword(user *entity.ForgotPasswordRequestDTO) (bool, error)
+	ChangeForgotPassword(user *entity.ChangeForgotPasswordRequestDTO) (bool, error)
 
 	// DeleteUser(id uint) (bool, error)
 }
@@ -25,7 +27,8 @@ type UserRepository interface {
 	GetById(id uint) (*model.UserModel, error)
 	UpdateUserPassword(userId uint, password string) error
 	UpdateForgotPasswordUserToken(userId uint, password string) error
-	// Update(bank *model.UserModel) error
+	GetUserForgotPasswordToken(token string) (*model.UserModel, error)
+	UpdateRemoveUserForgotPasswordToken(userId uint) error
 
 	// Delete(id uint) (bool, error)
 }

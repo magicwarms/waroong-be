@@ -74,7 +74,7 @@ func (userRepo *userRepository) GetById(userId uint) (*model.UserModel, error) {
 	var user model.UserModel
 	result := userRepo.db.Preload("UserType", func(db *gorm.DB) *gorm.DB {
 		return db.Select("id", "name", "is_active")
-	}).Preload("Profile").Select("users.id", "email", "password", "users.is_active", "user_type_id").Where("id = ?", userId).Take(&user)
+	}).Preload("Profile").Select("users.id", "email", "password", "users.is_active", "user_type_id", "created_at", "updated_at").Where("id = ?", userId).Take(&user)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return &model.UserModel{}, result.Error
@@ -87,7 +87,7 @@ func (userRepo *userRepository) GetById(userId uint) (*model.UserModel, error) {
 	return &user, nil
 }
 
-// Update is to update user data based on user input
+// UpdateUserPassword is to update user data based on user input
 func (userRepo *userRepository) UpdateUserPassword(userId uint, password string) error {
 	if err := userRepo.db.Select("password").Updates(&model.UserModel{ID: userId, Password: password}).Error; err != nil {
 		return err
@@ -95,7 +95,7 @@ func (userRepo *userRepository) UpdateUserPassword(userId uint, password string)
 	return nil
 }
 
-// Update is to update user data based on user input
+// UpdateForgotPasswordUserToken is to update user data based on user input
 func (userRepo *userRepository) UpdateForgotPasswordUserToken(userId uint, token string) error {
 	if err := userRepo.db.Select("forgot_password_token").Updates(&model.UserModel{ID: userId, ForgotPasswordToken: token}).Error; err != nil {
 		return err
@@ -112,4 +112,28 @@ func (userRepo *userRepository) Delete(id uint) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// GetUserTokenByEmailAndToken is to get forgot password token and id by Email and Token
+func (userRepo *userRepository) GetUserForgotPasswordToken(token string) (*model.UserModel, error) {
+	var user model.UserModel
+	result := userRepo.db.Select("id", "forgot_password_token").Where("forgot_password_token = ?", token).Take(&user)
+
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return &model.UserModel{}, result.Error
+	}
+
+	if result.Error != nil {
+		return &model.UserModel{}, result.Error
+	}
+
+	return &user, nil
+}
+
+// UpdateRemoveUserForgotPasswordToken is to update user data based on user input
+func (userRepo *userRepository) UpdateRemoveUserForgotPasswordToken(userId uint) error {
+	if err := userRepo.db.Select("forgot_password_token").Updates(&model.UserModel{ID: userId, ForgotPasswordToken: ""}).Error; err != nil {
+		return err
+	}
+	return nil
 }
