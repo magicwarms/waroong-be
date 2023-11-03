@@ -1,6 +1,8 @@
 package users
 
 import (
+	"errors"
+	"strconv"
 	"waroong-be/apps/middlewares"
 	"waroong-be/apps/users/entity"
 	"waroong-be/apps/users/interfaces"
@@ -9,27 +11,28 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// TO-DO
-// add middleware later
 func NewUserHandler(user fiber.Router, userService interfaces.UserService) {
-	user.Post("/store", middlewares.CheckAuthorization, AddNewUser(userService))
-	user.Get("/all", middlewares.CheckAuthorization, GetAllSuperadminUsers(userService))
-	// user.Post("/login", Login(userService))
-	// bank.Get("/get/:id", middlewares.CheckAuthorization, GetBankById(userService))
-	// bank.Patch("/update", middlewares.CheckAuthorization, UpdateBank(userService))
+	user.Post("/store", AddNewUser(userService))
+	user.Get("/superadmin/all", middlewares.CheckSuperadminAuthorization, GetAllSuperadminUsers(userService))
+	user.Post("/login", Login(userService))
+	user.Get("/profile", middlewares.CheckAuthorization, GetUserProfile(userService))
+	user.Patch("/superadmin/change_password/user", middlewares.CheckSuperadminAuthorization, ChangeSuperadminPassword(userService))
+	user.Patch("/update", middlewares.CheckAuthorization, UpdateUser(userService))
 	// user.Delete("/delete", middlewares.CheckAuthorization, DeleteUser(userService))
-	// user.Post("/customer/store", middlewares.CheckAuthorization, AddNewCustomer(userService))
+	user.Post("/forgot_password", ForgotPasswordUser(userService))
+	user.Patch("/change_forgot_password", ChangeForgotPasswordUser(userService))
 }
 
 // AddNewUser is store user superadmin data into database
 func AddNewUser(userService interfaces.UserService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		userDTO := &entity.UserRequestDTO{
-			Email:     c.FormValue("email"),
-			Password:  c.FormValue("password"),
-			FirstName: c.FormValue("firstname"),
-			LastName:  c.FormValue("lastname"),
-			Phone:     c.FormValue("phone"),
+		userDTO := &entity.AddUserRequestDTO{
+			Email:      c.FormValue("email"),
+			Password:   c.FormValue("password"),
+			FirstName:  c.FormValue("firstname"),
+			LastName:   c.FormValue("lastname"),
+			Phone:      c.FormValue("phone"),
+			UserTypeId: c.FormValue("user_type_id"),
 		}
 
 		if err := c.BodyParser(userDTO); err != nil {
@@ -49,6 +52,33 @@ func AddNewUser(userService interfaces.UserService) fiber.Handler {
 	}
 }
 
+// UpdateUser is update user data into database
+func UpdateUser(userService interfaces.UserService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		userUpdateDTO := &entity.UpdateUserRequestDTO{
+			ID:        c.GetRespHeader("userId"),
+			FirstName: c.FormValue("firstname"),
+			LastName:  c.FormValue("lastname"),
+			Phone:     c.FormValue("phone"),
+		}
+
+		if err := c.BodyParser(userUpdateDTO); err != nil {
+			return config.ErrorResponse(err, c)
+		}
+
+		validationErr := config.ValidateFields(*userUpdateDTO)
+		if validationErr != nil {
+			return config.ValidateResponse(validationErr, c)
+		}
+
+		err := userService.UpdateUser(userUpdateDTO)
+		if err != nil {
+			return config.ErrorResponse(err, c)
+		}
+		return config.AppResponse(nil, c)
+	}
+}
+
 // GetAllSuperadminUsers is to get all users data
 func GetAllSuperadminUsers(userService interfaces.UserService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
@@ -60,58 +90,142 @@ func GetAllSuperadminUsers(userService interfaces.UserService) fiber.Handler {
 	}
 }
 
-// // AddNewUser is store user data into database
-// func AddNewCustomer(userService interfaces.UserService) fiber.Handler {
-// 	return func(c *fiber.Ctx) error {
-// 		userDTO := &entity.UserRequestDTO{
-// 			Email:     c.FormValue("email"),
-// 			Password:  c.FormValue("password"),
-// 			FirstName: c.FormValue("firstname"),
-// 			LastName:  c.FormValue("lastname"),
-// 		}
+// Login is to get all users data
+func Login(userService interfaces.UserService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		userLoginDTO := &entity.UserLoginRequestDTO{
+			Email:    c.FormValue("email"),
+			Password: c.FormValue("password"),
+		}
 
-// 		if err := c.BodyParser(userDTO); err != nil {
-// 			return config.ErrorResponse(err, c)
-// 		}
+		if err := c.BodyParser(userLoginDTO); err != nil {
+			return config.ErrorResponse(err, c)
+		}
 
-// 		validationErr := config.ValidateFields(*userDTO)
-// 		if validationErr != nil {
-// 			return config.ValidateResponse(validationErr, c)
-// 		}
+		validationErr := config.ValidateFields(*userLoginDTO)
+		if validationErr != nil {
+			return config.ValidateResponse(validationErr, c)
+		}
 
-// 		err := userService.StoreUser(userDTO)
-// 		if err != nil {
-// 			return config.ErrorResponse(err, c)
-// 		}
-// 		return config.AppResponse(nil, c)
-// 	}
-// }
+		userLogin, err := userService.LoginUser(userLoginDTO)
 
-// // GetBankById is to get spesific bank data by bank ID
-// func GetBankById(bankService interfaces.BankService) fiber.Handler {
-// 	return func(c *fiber.Ctx) error {
-// 		// get bankId from header value
-// 		var id string = c.Params("id")
+		if err != nil {
+			return config.ErrorResponse(err, c)
+		}
 
-// 		bankDTO := &entity.BankGetIDRequestDTO{
-// 			ID: id,
-// 		}
+		return config.AppResponse(userLogin, c)
+	}
+}
 
-// 		validationErr := config.ValidateFields(*bankDTO)
-// 		if validationErr != nil {
-// 			return config.ValidateResponse(validationErr, c)
-// 		}
+// GetUserProfile is to get spesific user data by user ID
+func GetUserProfile(userService interfaces.UserService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// get userId from token payload
+		userId := c.GetRespHeader("userId")
 
-// 		getBank, err := bankService.GetBankById(id)
-// 		if err != nil {
-// 			return config.ErrorResponse(err, c)
-// 		}
-// 		if getBank.ID == "" {
-// 			getBank = nil
-// 		}
-// 		return config.AppResponse(&getBank, c)
-// 	}
-// }
+		parseUserId, errParseUserId := strconv.ParseUint(userId, 10, 64)
+		if errParseUserId != nil {
+			return errors.New(errParseUserId.Error())
+		}
+
+		userIdDTO := &entity.UserGetIDRequestDTO{
+			ID: userId,
+		}
+
+		validationErr := config.ValidateFields(*userIdDTO)
+		if validationErr != nil {
+			return config.ValidateResponse(validationErr, c)
+		}
+
+		user, err := userService.GetUserById(parseUserId)
+		if err != nil {
+			return config.ErrorResponse(err, c)
+		}
+		if user.Email == "" {
+			user = nil
+		}
+		return config.AppResponse(&user, c)
+	}
+}
+
+func ChangeSuperadminPassword(userService interfaces.UserService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// get userId from token payload
+		userId := c.GetRespHeader("userId")
+
+		changeUserPasswordDTO := &entity.ChangePasswordUserDTO{
+			UserID:   userId,
+			Password: c.FormValue("password"),
+		}
+
+		if err := c.BodyParser(changeUserPasswordDTO); err != nil {
+			return config.ErrorResponse(err, c)
+		}
+
+		validationErr := config.ValidateFields(*changeUserPasswordDTO)
+		if validationErr != nil {
+			return config.ValidateResponse(validationErr, c)
+		}
+
+		err := userService.UpdateSuperadminPassword(changeUserPasswordDTO)
+
+		if err != nil {
+			return config.ErrorResponse(err, c)
+		}
+
+		return config.AppResponse(nil, c)
+
+	}
+}
+
+// ForgotPasswordUser is store user superadmin data into database
+func ForgotPasswordUser(userService interfaces.UserService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		forgotPasswordDTO := &entity.ForgotPasswordRequestDTO{
+			Email: c.FormValue("email"),
+		}
+
+		if err := c.BodyParser(forgotPasswordDTO); err != nil {
+			return config.ErrorResponse(err, c)
+		}
+
+		validationErr := config.ValidateFields(*forgotPasswordDTO)
+		if validationErr != nil {
+			return config.ValidateResponse(validationErr, c)
+		}
+
+		forgotPassword, err := userService.ForgotPassword(forgotPasswordDTO)
+		if err != nil {
+			return config.ErrorResponse(err, c)
+		}
+		return config.AppResponse(forgotPassword, c)
+	}
+}
+
+// ChangeForgotPasswordUser is to change the user password after forgot password
+func ChangeForgotPasswordUser(userService interfaces.UserService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		changeForgotPasswordDTO := &entity.ChangeForgotPasswordRequestDTO{
+			Password: c.FormValue("password"),
+			Token:    c.FormValue("token"),
+		}
+
+		if err := c.BodyParser(changeForgotPasswordDTO); err != nil {
+			return config.ErrorResponse(err, c)
+		}
+
+		validationErr := config.ValidateFields(*changeForgotPasswordDTO)
+		if validationErr != nil {
+			return config.ValidateResponse(validationErr, c)
+		}
+
+		forgotPassword, err := userService.ChangeForgotPassword(changeForgotPasswordDTO)
+		if err != nil {
+			return config.ErrorResponse(err, c)
+		}
+		return config.AppResponse(forgotPassword, c)
+	}
+}
 
 // // UpdateBank is update user data into database
 // func UpdateBank(bankService interfaces.BankService) fiber.Handler {
@@ -175,32 +289,5 @@ func GetAllSuperadminUsers(userService interfaces.UserService) fiber.Handler {
 // 		}
 
 // 		return config.AppResponse(deleteUser, c)
-// 	}
-// }
-
-// // Login is to get all users data
-// func Login(userService interfaces.UserService) fiber.Handler {
-// 	return func(c *fiber.Ctx) error {
-// 		userLoginDTO := &entity.UserLoginRequestDTO{
-// 			Email:    c.FormValue("email"),
-// 			Password: c.FormValue("password"),
-// 		}
-
-// 		if err := c.BodyParser(userLoginDTO); err != nil {
-// 			return config.ErrorResponse(err, c)
-// 		}
-
-// 		validationErr := config.ValidateFields(*userLoginDTO)
-// 		if validationErr != nil {
-// 			return config.ValidateResponse(validationErr, c)
-// 		}
-
-// 		_, err := userService.LoginUser(userLoginDTO)
-
-// 		if err != nil {
-// 			return config.ErrorResponse(err, c)
-// 		}
-
-// 		return config.AppResponse(nil, c)
 // 	}
 // }

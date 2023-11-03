@@ -5,24 +5,25 @@ import (
 	"time"
 	userProfile "waroong-be/apps/user_profiles/model"
 	userType "waroong-be/apps/user_types/model"
+	"waroong-be/apps/utils"
 	"waroong-be/config"
 
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
 // UserModel Constructs your UserModel under entities.
 type UserModel struct {
-	ID         uint                         `gorm:"primaryKey" json:"id"`
-	Email      string                       `gorm:"not null;unique" json:"email"`
-	Password   string                       `gorm:"not null" json:"-"`
-	IsActive   *bool                        `gorm:"type:boolean; default:true; not null" json:"is_active"`
-	UserTypeID uint                         `json:"user_type_id"`
-	UserType   userType.UserTypeModel       `json:"user_type"`
-	Profile    userProfile.UserProfileModel `gorm:"foreignKey:UserID; constraint:OnDelete:CASCADE;" json:"profile"`
-	CreatedAt  time.Time                    `json:"created_at"`
-	UpdatedAt  time.Time                    `json:"updated_at"`
-	DeletedAt  gorm.DeletedAt               `gorm:"index" json:"deleted_at"`
+	ID                  uint64                       `gorm:"primaryKey" json:"id"`
+	Email               string                       `gorm:"not null;unique" json:"email"`
+	Password            string                       `gorm:"not null" json:"-"`
+	IsActive            *bool                        `gorm:"type:boolean;default:true; not null" json:"is_active"`
+	UserTypeID          uint64                       `gorm:"not null" json:"user_type_id"`
+	ForgotPasswordToken string                       `gorm:"null;unique" json:"-"`
+	UserType            userType.UserTypeModel       `json:"user_type"`
+	Profile             userProfile.UserProfileModel `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE;" json:"profile"`
+	CreatedAt           time.Time                    `json:"created_at"`
+	UpdatedAt           time.Time                    `json:"updated_at"`
+	DeletedAt           gorm.DeletedAt               `gorm:"index" json:"deleted_at"`
 }
 
 // Set tablename (GORM)
@@ -30,18 +31,10 @@ func (UserModel) TableName() string {
 	return "users"
 }
 
-func HashPassword(password string) ([]byte, error) {
-	return bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-}
-
-func VerifyPassword(hashedPassword, password string) error {
-	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
-}
-
 // DEFINE HOOKS
 func (user *UserModel) BeforeCreate(tx *gorm.DB) (err error) {
 	fmt.Println("Before create data", config.PrettyPrint(user))
-	hashedPassword, err := HashPassword(user.Password)
+	hashedPassword, err := utils.HashPassword(user.Password)
 	// if hash password error, return the error
 	if err != nil {
 		return err

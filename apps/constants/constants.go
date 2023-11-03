@@ -1,7 +1,8 @@
 package constants
 
 const (
-	SUPERADMIN_USER_ROLE = 1
-	CUSTOMER_USER_ROLE   = 2
-	MERCHANT_USER_ROLE   = 3
+	SUPERADMIN_USER_ROLE uint   = 1
+	CUSTOMER_USER_ROLE   uint   = 2
+	MERCHANT_USER_ROLE   uint   = 3
+	DEV_ENV              string = "development"
 )

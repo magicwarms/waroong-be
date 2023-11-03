@@ -1,7 +1,6 @@
 package config
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -18,7 +17,7 @@ var (
 )
 
 // InitDatabase is initial Setup for DB Connection
-func InitDatabase() (*gorm.DB, *sql.DB) {
+func InitDatabase() *gorm.DB {
 	var err error
 	appEnv := GoDotEnvVariable("APPLICATION_ENV")
 	sslMode := "sslmode=require"
@@ -33,8 +32,8 @@ func InitDatabase() (*gorm.DB, *sql.DB) {
 	} else if appEnv == "staging" {
 		logLvl = logger.Warn
 	} else {
-		// logLvl = logger.Info
-		logLvl = logger.Warn
+		logLvl = logger.Info
+		// logLvl = logger.Warn
 	}
 	dbLogger := logger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
@@ -56,13 +55,19 @@ func InitDatabase() (*gorm.DB, *sql.DB) {
 
 	if err != nil {
 		fmt.Println(err)
-
 		panic("failed to connect database")
 	}
 	sqlDB, errConnPool := DB.DB()
 	if errConnPool != nil {
 		fmt.Println(errConnPool.Error())
 		panic(errConnPool.Error())
+	}
+
+	// Ping
+	errSqlPing := sqlDB.Ping()
+	if errSqlPing != nil {
+		fmt.Println(errSqlPing)
+		panic("failed to connect database")
 	}
 
 	// SetMaxIdleConns sets the maximum number of connections in the idle connection pool.
@@ -74,5 +79,5 @@ func InitDatabase() (*gorm.DB, *sql.DB) {
 
 	fmt.Println("⚡️DB Connection opened!")
 
-	return DB, sqlDB
+	return DB
 }

@@ -2,36 +2,57 @@ package users
 
 import (
 	"errors"
-	"waroong-be/apps/constants"
+	"fmt"
+	"strconv"
+	"time"
+	userProfileEntity "waroong-be/apps/user_profiles/entity"
+	userProfileInterfaces "waroong-be/apps/user_profiles/interfaces"
 	profileModel "waroong-be/apps/user_profiles/model"
+	userTypeInterfaces "waroong-be/apps/user_types/interfaces"
 	"waroong-be/apps/users/entity"
 	"waroong-be/apps/users/interfaces"
 	"waroong-be/apps/users/model"
+	"waroong-be/apps/utils"
+	"waroong-be/config"
+
+	"github.com/golang-jwt/jwt/v5"
+
+	mailjet "github.com/mailjet/mailjet-apiv3-go"
 )
 
 type userService struct {
-	userRepository interfaces.UserRepository
+	userRepository     interfaces.UserRepository
+	userTypeService    userTypeInterfaces.UserTypeService
+	userProfileService userProfileInterfaces.UserProfileService
 }
 
 // NewService is used to create a single instance of the service
-func NewService(r interfaces.UserRepository) interfaces.UserService {
+func NewService(r interfaces.UserRepository, userTypeService userTypeInterfaces.UserTypeService, userProfileService userProfileInterfaces.UserProfileService) interfaces.UserService {
 	return &userService{
-		userRepository: r,
+		userRepository:     r,
+		userTypeService:    userTypeService,
+		userProfileService: userProfileService,
 	}
 }
 
-// SaveBank is a service layer that helps insert user admin data to database
-func (s *userService) StoreUser(user *entity.UserRequestDTO) error {
+// StoreUser is a service layer that helps insert user data to database
+func (s *userService) StoreUser(user *entity.AddUserRequestDTO) error {
+
 	checkEmail, _ := s.userRepository.GetUserByEmail(user.Email)
 	if checkEmail.Email != "" {
-		return errors.New("email already existedsss")
+		return errors.New("email already existed")
+	}
+
+	userTypeId, errParseUint := strconv.ParseUint(user.UserTypeId, 10, 64)
+	if errParseUint != nil {
+		return errors.New(errParseUint.Error())
 	}
 
 	// start to insert the data to database through repository
-	errSave := s.userRepository.Save(&model.UserModel{
+	errSave := s.userRepository.Store(&model.UserModel{
 		Email:      user.Email,
 		Password:   user.Password,
-		UserTypeID: constants.SUPERADMIN_USER_ROLE,
+		UserTypeID: userTypeId,
 		Profile: profileModel.UserProfileModel{
 			FirstName: user.FirstName,
 			LastName:  user.LastName,
@@ -46,33 +67,31 @@ func (s *userService) StoreUser(user *entity.UserRequestDTO) error {
 	return nil
 }
 
-// // StoreCustomer is a service layer that helps insert customer data to database
-// func (s *userService) StoreCustomer(user *entity.UserRequestDTO) error {
+// UpdateUser is a service layer that helps update user data to database
+func (s *userService) UpdateUser(user *entity.UpdateUserRequestDTO) error {
+	parseUserId, errParseUserId := strconv.ParseUint(user.ID, 10, 64)
+	if errParseUserId != nil {
+		return errParseUserId
+	}
 
-// 	checkEmail, _ := s.userRepository.GetUserByEmail(user.Email, constants.CUSTOMER_USER_ROLE)
-// 	if checkEmail.Email != "" {
-// 		return errors.New("email already existed")
-// 	}
+	checkUser, _ := s.userRepository.GetById(parseUserId)
+	if checkUser.Email == "" {
+		return errors.New("the user doesn't exists")
+	}
 
-// 	// start to insert the data to database through repository
-// 	errSave := s.userRepository.Save(&model.UserModel{
-// 		Email:      user.Email,
-// 		Password:   user.Password,
-// 		UserTypeID: constants.SUPERADMIN_USER_ROLE,
-// 		Profile: profileModel.UserProfileModel{
-// 			FirstName: user.FirstName,
-// 			LastName:  user.LastName,
-// 			Phone:     user.Phone,
-// 		},
-// 	})
+	errUpdate := s.userProfileService.UpdateUserProfile(&userProfileEntity.UpdateUserRequestDTO{
+		ID:        checkUser.Profile.ID,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		Phone:     user.Phone,
+	})
 
-// 	if errSave != nil {
-// 		return errSave
-// 	}
+	if errUpdate != nil {
+		return errUpdate
+	}
 
-// 	return nil
-
-// }
+	return nil
+}
 
 // FindAllSuperadminUsers is a service layer that helps fetch all banks in Banks table
 func (s *userService) FindAllSuperadminUsers() ([]*model.UserModel, error) {
@@ -83,48 +102,161 @@ func (s *userService) FindAllSuperadminUsers() ([]*model.UserModel, error) {
 	return getAllUsers, nil
 }
 
-// func (s *userService) LoginUser(userLogin *entity.UserLoginRequestDTO) (*entity.LoginUserResponse, error) {
-// 	user, _ := s.userRepository.GetUserByEmail(userLogin.Email)
-// 	if user.Email == "" {
-// 		return &entity.LoginUserResponse{}, errors.New("email does not exists")
-// 	}
-// 	isPasswordCorrect := model.VerifyPassword(user.Password, userLogin.Password)
-// 	if isPasswordCorrect != nil && isPasswordCorrect == bcrypt.ErrMismatchedHashAndPassword {
-// 		return &entity.LoginUserResponse{}, errors.New("password is wrong")
-// 	}
+func (s *userService) LoginUser(userLogin *entity.UserLoginRequestDTO) (*entity.LoginUserResponse, error) {
+	user, errGetUserEmail := s.userRepository.GetUserByEmail(userLogin.Email)
 
-// 	// Create the Claims
-// 	claims := jwt.MapClaims{
-// 		"id":         user.ID,
-// 		"userTypeId": user.UserType.ID,
-// 		"email":      user.Email,
-// 		"expiresAt":  time.Now().Local().Add(time.Hour * time.Duration(72)).Unix(), //3 days
-// 	}
-// 	// Create token
-// 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
-// 	// Generate encoded token and send it as response.
-// 	generatedToken, err := token.SignedString([]byte(config.GoDotEnvVariable("SECRET_KEY")))
-// 	if err != nil {
-// 		return &entity.LoginUserResponse{}, err
-// 	}
+	if errGetUserEmail != nil {
+		return &entity.LoginUserResponse{}, errors.New("the email didn't exist")
+	}
 
-// 	return &entity.LoginUserResponse{
-// 		ID:        user.ID,
-// 		Email:     user.Email,
-// 		Token:     generatedToken,
-// 		ExpiresAt: "3 days",
-// 	}, nil
+	errPasswordIncorrect := utils.VerifyPassword(user.Password, userLogin.Password)
+	if errPasswordIncorrect != nil {
+		return &entity.LoginUserResponse{}, errors.New("password is incorrect")
+	}
 
-// }
+	// Create the Claims
+	claims := jwt.MapClaims{
+		"id":         user.ID,
+		"userTypeId": user.UserType.ID,
+		"expiresAt":  time.Now().Local().Add(time.Hour * time.Duration(72)).Unix(), //3 days
+	}
 
-// // GetBankById is a service layer that helps get book data
-// func (s *bankService) GetBankById(id string) (*model.BankModel, error) {
-// 	getBank, err := s.bankRepository.GetById(id)
-// 	if err != nil {
-// 		return &model.BankModel{}, err
-// 	}
-// 	return getBank, nil
-// }
+	// Create token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+	// Generate encoded token and send it as response.
+	generatedToken, err := token.SignedString([]byte(config.GoDotEnvVariable("SECRET_KEY")))
+	if err != nil {
+		return &entity.LoginUserResponse{}, err
+	}
+
+	userType, _ := s.userTypeService.GetUserTypeById(user.UserType.ID)
+
+	return &entity.LoginUserResponse{
+		ID:        user.ID,
+		Email:     user.Email,
+		Token:     generatedToken,
+		ExpiresAt: "3 days",
+		UserType:  userType,
+	}, nil
+
+}
+
+// GetUserById is a service layer that helps get user by id
+func (s *userService) GetUserById(userId uint64) (*model.UserModel, error) {
+	getUser, err := s.userRepository.GetById(userId)
+	if err != nil {
+		return &model.UserModel{}, err
+	}
+	return getUser, nil
+}
+
+func (s *userService) UpdateSuperadminPassword(data *entity.ChangePasswordUserDTO) error {
+	parseUserId, errParseUserId := strconv.ParseUint(data.UserID, 10, 64)
+	if errParseUserId != nil {
+		return errParseUserId
+	}
+
+	getUser, errGetUser := s.userRepository.GetById(parseUserId)
+	if errGetUser != nil {
+		return errGetUser
+	}
+
+	hashedPassword, errHashPassword := utils.HashPassword(data.Password)
+	if errHashPassword != nil {
+		return errHashPassword
+	}
+	newUserPassword := string(hashedPassword)
+
+	errUpdatePassword := s.userRepository.UpdateUserPassword(getUser.ID, newUserPassword)
+
+	if errUpdatePassword != nil {
+		return errUpdatePassword
+	}
+
+	return nil
+}
+
+func (s *userService) ForgotPassword(userData *entity.ForgotPasswordRequestDTO) (bool, error) {
+	user, errGetUserEmail := s.userRepository.GetUserByEmail(userData.Email)
+
+	if errGetUserEmail != nil {
+		return false, errors.New("the email didn't exist")
+	}
+
+	forgotPasswordToken := utils.GenerateRandomStringBytes(20)
+
+	go s.userRepository.UpdateForgotPasswordUserToken(user.ID, forgotPasswordToken)
+
+	templateData := entity.ForgotPasswordEmailParams{
+		Name:  user.Profile.FirstName + " " + user.Profile.LastName,
+		Token: forgotPasswordToken,
+	}
+	sendEmail, errorSendForgotEmail := sendForgotPasswordEmail(templateData, user)
+	if errorSendForgotEmail != nil {
+		return false, errorSendForgotEmail
+	}
+
+	if sendEmail {
+		fmt.Println("======================EMAIL SUCCESSFULLY SENT TO " + user.Email + " ======================")
+	}
+
+	return true, nil
+
+}
+
+func sendForgotPasswordEmail(templateData entity.ForgotPasswordEmailParams, user *model.UserModel) (bool, error) {
+	userfullName := user.Profile.FirstName + " " + user.Profile.LastName
+	htmlFile, errHtmlFile := config.ParseHtmlTemplate("forgot_password.html", templateData)
+
+	if errHtmlFile != nil {
+		return false, errHtmlFile
+	}
+
+	messagesInfo := []mailjet.InfoMessagesV31{
+		{
+			From: &mailjet.RecipientV31{
+				Email: config.GoDotEnvVariable("MJ_EMAIL_SENDER"),
+				Name:  "No-Reply - Beyond Astro",
+			},
+			To: &mailjet.RecipientsV31{
+				mailjet.RecipientV31{
+					Email: user.Email,
+					Name:  userfullName,
+				},
+			},
+			Subject:  "Forgot Password -" + userfullName,
+			HTMLPart: htmlFile,
+		},
+	}
+
+	emailResponseStatus := config.SendEmail(messagesInfo)
+
+	return emailResponseStatus == "success", nil
+}
+
+func (s *userService) ChangeForgotPassword(user *entity.ChangeForgotPasswordRequestDTO) (bool, error) {
+	userToken, errUserToken := s.userRepository.GetUserForgotPasswordToken(user.Token)
+
+	if errUserToken != nil || userToken == nil {
+		return false, errors.New("token forgot password is incorrect")
+	}
+
+	hashedPassword, errHashPassword := utils.HashPassword(user.Password)
+	if errHashPassword != nil {
+		return false, errHashPassword
+	}
+	newUserPassword := string(hashedPassword)
+
+	errUpdatePassword := s.userRepository.UpdateUserPassword(userToken.ID, newUserPassword)
+
+	go s.userRepository.UpdateRemoveUserForgotPasswordToken(userToken.ID)
+
+	if errUpdatePassword != nil {
+		return false, errUpdatePassword
+	}
+
+	return true, nil
+}
 
 // // UpdateBank is a service layer that helps update bank data to database
 // func (s *bankService) UpdateBank(bank *entity.BankUpdateRequestDTO) error {

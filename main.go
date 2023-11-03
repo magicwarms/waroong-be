@@ -49,9 +49,8 @@ func main() {
 	// metricPage.Get("/metrics", monitor.New(monitor.Config{Title: "Waroong - Backend", Refresh: 5 * time.Second}))
 
 	// set up DB connection here
-	DBConnection, sqlDB := config.InitDatabase()
-	// Ping
-	sqlDB.Ping()
+	DBConnection := config.InitDatabase()
+
 	// setup initial routes
 	apiV1 := app.Group("/api/v1")
 	// set dispatch to the main router

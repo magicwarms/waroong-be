@@ -3,7 +3,7 @@ package config
 type DefaultResponse struct {
 	Success bool        `json:"success"`
 	Data    interface{} `json:"data"`
-	Errors  string      `json:"errors"`
+	Errors  interface{} `json:"errors"`
 }
 
 type ValidationDefaultResponse struct {

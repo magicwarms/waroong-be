@@ -1,14 +1,12 @@
 package routers
 
 import (
+	"waroong-be/apps/user_profiles"
 	"waroong-be/apps/user_types"
+	"waroong-be/apps/users"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
-
-	// "waroong-be/apps/user_profiles"
-	// "waroong-be/apps/user_types"
-	"waroong-be/apps/users"
 )
 
 func Dispatch(DBConnection *gorm.DB, apiV1 fiber.Router) {
@@ -18,14 +16,16 @@ func Dispatch(DBConnection *gorm.DB, apiV1 fiber.Router) {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{"success": true})
 	})
 
-	// USER
+	// REPOSITORIES
 	userRepo := users.NewRepo(DBConnection)
-	userService := users.NewService(userRepo)
+	userTypeRepo := user_types.NewRepo(DBConnection)
+	userProfileRepo := user_profiles.NewRepo(DBConnection)
+
+	// SERVICES
+	userTypeService := user_types.NewService(userTypeRepo)
+	userProfileService := user_profiles.NewService(userProfileRepo)
+	userService := users.NewService(userRepo, userTypeService, userProfileService)
+
+	// HANDLERS
 	users.NewUserHandler(apiV1.Group("/users"), userService)
-
-	// // USER_TYPE
-	user_types.NewRepo(DBConnection)
-
-	// // USER_PROFILE
-	// user_profiles.NewRepo(DBConnection)
 }

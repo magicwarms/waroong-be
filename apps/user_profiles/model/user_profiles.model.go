@@ -10,8 +10,8 @@ import (
 
 // UserProfileModel Constructs your UserProfileModel under entities.
 type UserProfileModel struct {
-	ID        uint   `gorm:"primaryKey" json:"id"`
-	UserID    uint   `gorm:"not null" json:"user_id"`
+	ID        uint64 `gorm:"primaryKey" json:"id"`
+	UserID    uint64 `gorm:"not null" json:"user_id"`
 	FirstName string `gorm:"index:,not null" json:"first_name"`
 	LastName  string `gorm:"index:,not null" json:"last_name"`
 	// if you want to make it column not null, do below!
