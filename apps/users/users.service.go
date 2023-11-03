@@ -52,7 +52,7 @@ func (s *userService) StoreUser(user *entity.AddUserRequestDTO) error {
 	errSave := s.userRepository.Store(&model.UserModel{
 		Email:      user.Email,
 		Password:   user.Password,
-		UserTypeID: uint(userTypeId),
+		UserTypeID: userTypeId,
 		Profile: profileModel.UserProfileModel{
 			FirstName: user.FirstName,
 			LastName:  user.LastName,
@@ -74,13 +74,13 @@ func (s *userService) UpdateUser(user *entity.UpdateUserRequestDTO) error {
 		return errParseUserId
 	}
 
-	checkUser, _ := s.userRepository.GetById(uint(parseUserId))
+	checkUser, _ := s.userRepository.GetById(parseUserId)
 	if checkUser.Email == "" {
 		return errors.New("the user doesn't exists")
 	}
 
 	errUpdate := s.userProfileService.UpdateUserProfile(&userProfileEntity.UpdateUserRequestDTO{
-		ID:        uint(checkUser.Profile.ID),
+		ID:        checkUser.Profile.ID,
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
 		Phone:     user.Phone,
@@ -142,7 +142,7 @@ func (s *userService) LoginUser(userLogin *entity.UserLoginRequestDTO) (*entity.
 }
 
 // GetUserById is a service layer that helps get user by id
-func (s *userService) GetUserById(userId uint) (*model.UserModel, error) {
+func (s *userService) GetUserById(userId uint64) (*model.UserModel, error) {
 	getUser, err := s.userRepository.GetById(userId)
 	if err != nil {
 		return &model.UserModel{}, err
@@ -156,7 +156,7 @@ func (s *userService) UpdateSuperadminPassword(data *entity.ChangePasswordUserDT
 		return errParseUserId
 	}
 
-	getUser, errGetUser := s.userRepository.GetById(uint(parseUserId))
+	getUser, errGetUser := s.userRepository.GetById(parseUserId)
 	if errGetUser != nil {
 		return errGetUser
 	}

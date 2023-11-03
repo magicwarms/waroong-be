@@ -13,11 +13,11 @@ import (
 
 // UserModel Constructs your UserModel under entities.
 type UserModel struct {
-	ID                  uint                         `gorm:"primaryKey" json:"id"`
+	ID                  uint64                       `gorm:"primaryKey" json:"id"`
 	Email               string                       `gorm:"not null;unique" json:"email"`
 	Password            string                       `gorm:"not null" json:"-"`
 	IsActive            *bool                        `gorm:"type:boolean;default:true; not null" json:"is_active"`
-	UserTypeID          uint                         `gorm:"not null" json:"user_type_id"`
+	UserTypeID          uint64                       `gorm:"not null" json:"user_type_id"`
 	ForgotPasswordToken string                       `gorm:"null;unique" json:"-"`
 	UserType            userType.UserTypeModel       `json:"user_type"`
 	Profile             userProfile.UserProfileModel `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE;" json:"profile"`

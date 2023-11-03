@@ -22,6 +22,7 @@ func (userProfile *userProfileService) UpdateUserProfile(user *entity.UpdateUser
 	// add validation for phone
 	// check phone has been used in another user data or not
 	// find user that only deleted_at null
+
 	// start to update the data to database through repository
 	errUpdate := userProfile.userProfileRepository.Update(&model.UserProfileModel{
 		ID:        user.ID,

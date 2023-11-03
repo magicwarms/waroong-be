@@ -12,7 +12,7 @@ type UserService interface {
 	FindAllSuperadminUsers() ([]*model.UserModel, error)
 	LoginUser(user *entity.UserLoginRequestDTO) (*entity.LoginUserResponse, error)
 	UpdateSuperadminPassword(user *entity.ChangePasswordUserDTO) error
-	GetUserById(id uint) (*model.UserModel, error)
+	GetUserById(id uint64) (*model.UserModel, error)
 	ForgotPassword(user *entity.ForgotPasswordRequestDTO) (bool, error)
 	ChangeForgotPassword(user *entity.ChangeForgotPasswordRequestDTO) (bool, error)
 
@@ -24,11 +24,11 @@ type UserRepository interface {
 	Store(user *model.UserModel) error
 	GetAllSuperadminUsers() ([]*model.UserModel, error)
 	GetUserByEmail(email string) (*model.UserModel, error)
-	GetById(id uint) (*model.UserModel, error)
-	UpdateUserPassword(userId uint, password string) error
-	UpdateForgotPasswordUserToken(userId uint, password string) error
+	GetById(id uint64) (*model.UserModel, error)
+	UpdateUserPassword(userId uint64, password string) error
+	UpdateForgotPasswordUserToken(userId uint64, password string) error
 	GetUserForgotPasswordToken(token string) (*model.UserModel, error)
-	UpdateRemoveUserForgotPasswordToken(userId uint) error
+	UpdateRemoveUserForgotPasswordToken(userId uint64) error
 
 	// Delete(id uint) (bool, error)
 }

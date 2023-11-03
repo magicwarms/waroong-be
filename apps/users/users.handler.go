@@ -137,7 +137,7 @@ func GetUserProfile(userService interfaces.UserService) fiber.Handler {
 			return config.ValidateResponse(validationErr, c)
 		}
 
-		user, err := userService.GetUserById(uint(parseUserId))
+		user, err := userService.GetUserById(parseUserId)
 		if err != nil {
 			return config.ErrorResponse(err, c)
 		}
